@@ -1,39 +1,31 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
-use thiserror::Error;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::lookup_host;
-use tokio::net::{TcpListener, TcpStream};
+
+use super::error::SOCKS5Error;
+use tokio::{
+    io::AsyncWriteExt,
+    net::{lookup_host, TcpStream},
+};
 
 const SOCKS5_VERSION: u8 = 0x05;
 const SOCKS5_SUBNEGOTIATION_VERSION: u8 = 0x01;
 const SOCKS5_RESERVE: u8 = 0x00;
 
-#[derive(Error, Debug)]
-enum SOCKS5Error {
-    #[error("Malformed packet")]
-    MalformedPacket,
-    #[error("Failed to find the required method for ID")]
-    IDMethodNotFound,
-    #[error("Failed to lookup hostnames")]
-    HostnameLookup,
-}
-
 enum SOCKS5Status {
     Ok,
-    Error,
+    _Error,
 }
 
 enum SOCKS5Method {
-    NoAuth,
-    GSSApi,
+    _NoAuth,
+    _GSSApi,
     UserPass,
     None = 0xff,
 }
 
 enum SOCKS5Command {
     Connect = 0x01,
-    Bind = 0x02,
-    Udp = 0x03,
+    _Bind = 0x02,
+    _Udp = 0x03,
 }
 
 enum SOCKS5AddrType {}
@@ -43,63 +35,7 @@ impl SOCKS5AddrType {
     const IPV6: u8 = 0x04;
 }
 
-enum ConsumerPassedState {
-    None,
-    Id,
-    Auth,
-    Request,
-}
-
-async fn process(mut socket: TcpStream) {
-    println!("consumer_server processing a socket");
-    let mut buf = [0u8; 1024];
-    let mut passed = ConsumerPassedState::None;
-    loop {
-        let n = match socket.read(&mut buf).await {
-            Ok(0) => {
-                println!("consumer socket has disconnected");
-                return;
-            }
-            Ok(n) => n,
-            Err(e) => {
-                eprintln!("failed to read from consumer socket, err: {e}");
-                return;
-            }
-        };
-
-        println!("consumer has sent {n} bytes: {:?}", &buf[..n]);
-
-        match passed {
-            ConsumerPassedState::None => {
-                println!("handling consumer id");
-                if let Err(e) = handle_identification(&mut socket, &buf[..n]).await {
-                    eprintln!("Error: {e}");
-                    return;
-                }
-                passed = ConsumerPassedState::Id;
-            }
-            ConsumerPassedState::Id => {
-                println!("handling consumer auth");
-                if let Err(e) = handle_authentification(&mut socket, &buf[..n]).await {
-                    eprintln!("Error: {e}");
-                    return;
-                }
-                passed = ConsumerPassedState::Auth;
-            }
-            ConsumerPassedState::Auth => {
-                println!("handling consumer request");
-                if let Err(e) = handle_request(&mut socket, &buf[..n]).await {
-                    eprintln!("Error: {e}");
-                    return;
-                }
-                passed = ConsumerPassedState::Request;
-            }
-            ConsumerPassedState::Request => {}
-        };
-    }
-}
-
-async fn handle_identification(socket: &mut TcpStream, buf: &[u8]) -> Result<(), SOCKS5Error> {
+pub async fn handle_identification(socket: &mut TcpStream, buf: &[u8]) -> Result<(), SOCKS5Error> {
     if buf.len() < 2 || buf[0] != SOCKS5_VERSION || buf[1] == 0 || buf.len() != buf[1] as usize + 2
     {
         println!("received an invalid socks5 id packet");
@@ -125,7 +61,10 @@ async fn handle_identification(socket: &mut TcpStream, buf: &[u8]) -> Result<(),
     Ok(())
 }
 
-async fn handle_authentification(socket: &mut TcpStream, buf: &[u8]) -> Result<(), SOCKS5Error> {
+pub async fn handle_authentification(
+    socket: &mut TcpStream,
+    buf: &[u8],
+) -> Result<(), SOCKS5Error> {
     if buf.len() < 2 || buf[0] != SOCKS5_SUBNEGOTIATION_VERSION {
         let _ = socket.shutdown().await;
         return Err(SOCKS5Error::MalformedPacket);
@@ -154,10 +93,11 @@ async fn handle_authentification(socket: &mut TcpStream, buf: &[u8]) -> Result<(
     let _ = socket
         .write_all(&[SOCKS5_SUBNEGOTIATION_VERSION, SOCKS5Status::Ok as u8])
         .await;
+
     Ok(())
 }
 
-async fn handle_request(socket: &mut TcpStream, buf: &[u8]) -> Result<SocketAddr, SOCKS5Error> {
+pub async fn handle_request(socket: &mut TcpStream, buf: &[u8]) -> Result<SocketAddr, SOCKS5Error> {
     if buf.len() < 4
         || buf[0] != SOCKS5_VERSION
         || buf[1] != SOCKS5Command::Connect as u8
@@ -234,15 +174,5 @@ async fn handle_request(socket: &mut TcpStream, buf: &[u8]) -> Result<SocketAddr
             let _ = socket.shutdown().await;
             Err(SOCKS5Error::MalformedPacket)
         }
-    }
-}
-
-pub async fn run(addr: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let listener = TcpListener::bind(addr).await?;
-    loop {
-        let (socket, _) = listener.accept().await?;
-        tokio::spawn(async move {
-            process(socket).await;
-        });
     }
 }
