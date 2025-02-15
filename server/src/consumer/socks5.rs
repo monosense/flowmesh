@@ -10,22 +10,25 @@ const SOCKS5_VERSION: u8 = 0x05;
 const SOCKS5_SUBNEGOTIATION_VERSION: u8 = 0x01;
 const SOCKS5_RESERVE: u8 = 0x00;
 
+#[allow(dead_code)]
 enum SOCKS5Status {
     Ok,
-    _Error,
+    Error,
 }
 
+#[allow(dead_code)]
 enum SOCKS5Method {
-    _NoAuth,
-    _GSSApi,
+    NoAuth,
+    GSSApi,
     UserPass,
     None = 0xff,
 }
 
+#[allow(dead_code)]
 enum SOCKS5Command {
     Connect = 0x01,
-    _Bind = 0x02,
-    _Udp = 0x03,
+    Bind = 0x02,
+    Udp = 0x03,
 }
 
 enum SOCKS5AddrType {}
