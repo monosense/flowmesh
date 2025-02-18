@@ -1,17 +1,11 @@
 use bincode;
+use common::packets::AuthorizationPacket;
 use hex;
-use serde::{Deserialize, Serialize};
 use std::io;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpSocket,
 };
-
-#[derive(Serialize, Deserialize, Debug)]
-struct AuthorizationPacket {
-    token: [u8; 32],
-    /* more data... */
-}
 
 const AUTHTOKEN: &str = "1a413d012682eb10342cdf7f0e33dd61c2b20e79e4c23feba399919f76d5b408";
 
@@ -42,8 +36,6 @@ async fn main() -> io::Result<()> {
         ));
     }
     // check if we have been authorized
-
-
 
     /*loop {
         let n = stream.read(&mut buf).await?;

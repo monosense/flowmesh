@@ -1,15 +1,13 @@
-use tokio::{io::AsyncReadExt, net::{TcpListener, TcpStream}};
-use hex;
 use bincode;
-use serde::{Serialize, Deserialize};
+use common::packets::AuthorizationPacket;
+use hex;
+use serde::{Deserialize, Serialize};
+use tokio::{
+    io::AsyncReadExt,
+    net::{TcpListener, TcpStream},
+};
 
 const AUTHTOKEN: &str = "1a413d012682eb10342cdf7f0e33dd61c2b20e79e4c23feba399919f76d5b408";
-
-#[derive(Serialize, Deserialize, Debug)]
-struct AuthorizationPacket {
-    token: [u8; 32],
-    /* more data... */
-}
 
 enum ProviderPassedState {
     None,
@@ -48,8 +46,7 @@ async fn process(mut socket: TcpStream) {
                 if hex::encode(authp.token) == AUTHTOKEN {
                     println!("got correct auth token");
                     /* TODO: respond accordingly */
-                }
-                else {
+                } else {
                     println!("incorrect auth token");
                     /* TODO: respond accordingly */
                     return;

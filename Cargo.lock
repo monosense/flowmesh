@@ -66,10 +66,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "flowmesh-client"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "common",
  "hex",
  "serde",
  "tokio",
@@ -80,6 +88,7 @@ name = "flowmesh-server"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "common",
  "hex",
  "serde",
  "thiserror",
