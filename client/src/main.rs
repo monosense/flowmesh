@@ -1,6 +1,4 @@
-use bincode;
 use common::packets::AuthorizationPacket;
-use hex;
 use std::io;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},

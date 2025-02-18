@@ -1,7 +1,6 @@
 use bincode;
 use common::packets::AuthorizationPacket;
 use hex;
-use serde::{Deserialize, Serialize};
 use tokio::{
     io::AsyncReadExt,
     net::{TcpListener, TcpStream},
