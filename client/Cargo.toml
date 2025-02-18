@@ -9,3 +9,4 @@ serde = { version = "1.0.217", features = ["derive"] }
 tokio = { version = "1.43.0", features = ["full"] }
 hex = "0.4"
 common = { path = "../common" }
+thiserror = "1.0"

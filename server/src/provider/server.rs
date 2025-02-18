@@ -1,8 +1,8 @@
 use bincode;
-use common::packets::AuthorizationPacket;
+use common::packets::{AuthorizationPacket, AuthorizationReplyPacket};
 use hex;
 use tokio::{
-    io::AsyncReadExt,
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
 
@@ -20,11 +20,13 @@ async fn process(mut socket: TcpStream) {
         let n = match socket.read(&mut buf).await {
             Ok(0) => {
                 println!("provider socket has disconnected");
+                let _ = socket.shutdown().await;
                 return;
             }
             Ok(n) => n,
             Err(e) => {
                 eprintln!("failed to read from provider socket, err: {e}");
+                let _ = socket.shutdown().await;
                 return;
             }
         };
@@ -37,6 +39,7 @@ async fn process(mut socket: TcpStream) {
                     Ok(data) => data,
                     Err(_) => {
                         println!("failed to deserialize provider data");
+                        let _ = socket.shutdown().await;
                         return;
                     }
                 };
@@ -44,10 +47,20 @@ async fn process(mut socket: TcpStream) {
                 println!("authp: {:?}", authp);
                 if hex::encode(authp.token) == AUTHTOKEN {
                     println!("got correct auth token");
-                    /* TODO: respond accordingly */
+                    let rep: AuthorizationReplyPacket = AuthorizationReplyPacket::new(0x00);
+                    let serialized = bincode::serialize(&rep).unwrap();
+                    if (socket.write(&serialized).await).is_err() {
+                        println!("failed to write auth reply packet to provider");
+                        let _ = socket.shutdown().await;
+                        return;
+                    }
+                    /* TODO: more logic... */
                 } else {
                     println!("incorrect auth token");
-                    /* TODO: respond accordingly */
+                    let rep: AuthorizationReplyPacket = AuthorizationReplyPacket::new(0x01);
+                    let serialized = bincode::serialize(&rep).unwrap();
+                    let _ = socket.write(&serialized).await;
+                    let _ = socket.shutdown().await;
                     return;
                 }
             }

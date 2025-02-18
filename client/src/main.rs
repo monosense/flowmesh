@@ -1,14 +1,27 @@
-use common::packets::AuthorizationPacket;
+use common::packets::{AuthorizationPacket, AuthorizationReplyPacket};
 use std::io;
+use thiserror::Error;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpSocket,
 };
 
-const AUTHTOKEN: &str = "1a413d012682eb10342cdf7f0e33dd61c2b20e79e4c23feba399919f76d5b408";
+#[derive(Debug, Error)]
+pub enum AuthError {
+    #[error("Unauthorized access")]
+    Unauthorized,
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Deserialization error: {0}")]
+    Deserialize(#[from] bincode::Error),
+    #[error("Hex decoding error: {0}")]
+    Hex(#[from] hex::FromHexError),
+}
+
+const AUTHTOKEN: &str = "1a413d012682eb10342cdf7f0e33dd61c2b20e79e4c23feba399919f76d5b409";
 
 #[tokio::main]
-async fn main() -> io::Result<()> {
+async fn main() -> Result<(), AuthError> {
     let addr = "127.0.0.1:1081".parse().unwrap();
 
     let socket = TcpSocket::new_v4()?;
@@ -16,36 +29,31 @@ async fn main() -> io::Result<()> {
 
     println!("connected to the server! {:?}", stream);
 
-    let token_arr: [u8; 32] = hex::decode(AUTHTOKEN).unwrap().try_into().unwrap();
-    let authp = AuthorizationPacket { token: token_arr };
+    let token_arr: [u8; 32] = hex::decode(AUTHTOKEN)?.try_into().unwrap();
+    let authp = AuthorizationPacket::new(token_arr);
 
     println!("authp: {:?}", authp);
 
-    let serialized = bincode::serialize(&authp).unwrap();
+    let serialized = bincode::serialize(&authp)?;
     println!("serialized: {:?}", serialized);
-    let _ = stream.write(&serialized).await?;
+    stream.write_all(&serialized).await?;
 
     let mut buf = [0u8; 1024];
     let n = stream.read(&mut buf).await?;
     if n == 0 {
-        return Err(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "Connection closed by peer",
-        ));
+        return Err(
+            io::Error::new(io::ErrorKind::UnexpectedEof, "Connection closed by peer").into(),
+        );
     }
-    // check if we have been authorized
 
-    /*loop {
-        let n = stream.read(&mut buf).await?;
-        if n == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "Connection closed by peer",
-            ));
-        }
+    let authresp: AuthorizationReplyPacket = bincode::deserialize(&buf[..n])?;
+    println!("authresp: {:?}", authresp);
 
-        println!("n: {n}");
-    }*/
+    if authresp.status == 0x00 {
+        println!("authorized successfully");
+    } else {
+        return Err(AuthError::Unauthorized);
+    }
 
     Ok(())
 }
