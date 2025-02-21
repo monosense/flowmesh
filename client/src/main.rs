@@ -1,4 +1,4 @@
-use common::packets::{AuthorizationPacket, AuthorizationReplyPacket};
+use common::packets::{AuthorizationPacket, AuthorizationReplyPacket, AuthorizationStatus};
 use std::io;
 use thiserror::Error;
 use tokio::{
@@ -49,8 +49,10 @@ async fn main() -> Result<(), AuthError> {
     let authresp: AuthorizationReplyPacket = bincode::deserialize(&buf[..n])?;
     println!("authresp: {:?}", authresp);
 
-    if authresp.status == 0x00 {
+    if authresp.status == AuthorizationStatus::Ok as u8 {
         println!("authorized successfully");
+
+        /* do something */
     } else {
         return Err(AuthError::Unauthorized);
     }

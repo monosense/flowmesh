@@ -5,6 +5,11 @@ enum Opcode {
     AuthorizationReply = 0x02,
 }
 
+pub enum AuthorizationStatus {
+    Ok = 0x00,
+    Error = 0x01,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AuthorizationPacket {
     pub opcode: u8,
@@ -28,10 +33,10 @@ pub struct AuthorizationReplyPacket {
 }
 
 impl AuthorizationReplyPacket {
-    pub fn new(status: u8) -> Self {
+    pub fn new(status: AuthorizationStatus) -> Self {
         Self {
             opcode: Opcode::AuthorizationReply as u8,
-            status,
+            status: status as u8,
         }
     }
 }

@@ -1,5 +1,5 @@
 use bincode;
-use common::packets::{AuthorizationPacket, AuthorizationReplyPacket};
+use common::packets::{AuthorizationPacket, AuthorizationReplyPacket, AuthorizationStatus};
 use hex;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -10,12 +10,13 @@ const AUTHTOKEN: &str = "1a413d012682eb10342cdf7f0e33dd61c2b20e79e4c23feba399919
 
 enum ProviderPassedState {
     None,
+    Authorized,
 }
 
 async fn process(mut socket: TcpStream) {
     println!("accepted a provider");
     let mut buf = [0u8; 1024];
-    let passed = ProviderPassedState::None;
+    let mut passed = ProviderPassedState::None;
     loop {
         let n = match socket.read(&mut buf).await {
             Ok(0) => {
@@ -45,25 +46,33 @@ async fn process(mut socket: TcpStream) {
                 };
 
                 println!("authp: {:?}", authp);
+
+                /*
+                 * TODO: check if `authp.token` is valid in database
+                 */
+
                 if hex::encode(authp.token) == AUTHTOKEN {
                     println!("got correct auth token");
-                    let rep: AuthorizationReplyPacket = AuthorizationReplyPacket::new(0x00);
+                    let rep: AuthorizationReplyPacket =
+                        AuthorizationReplyPacket::new(AuthorizationStatus::Ok);
                     let serialized = bincode::serialize(&rep).unwrap();
                     if (socket.write(&serialized).await).is_err() {
                         println!("failed to write auth reply packet to provider");
                         let _ = socket.shutdown().await;
                         return;
                     }
-                    /* TODO: more logic... */
+                    passed = ProviderPassedState::Authorized;
                 } else {
                     println!("incorrect auth token");
-                    let rep: AuthorizationReplyPacket = AuthorizationReplyPacket::new(0x01);
+                    let rep: AuthorizationReplyPacket =
+                        AuthorizationReplyPacket::new(AuthorizationStatus::Error);
                     let serialized = bincode::serialize(&rep).unwrap();
                     let _ = socket.write(&serialized).await;
                     let _ = socket.shutdown().await;
                     return;
                 }
             }
+            ProviderPassedState::Authorized => {}
         };
     }
 }
