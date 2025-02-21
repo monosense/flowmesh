@@ -5,6 +5,7 @@ enum Opcode {
     AuthorizationReply = 0x02,
 }
 
+#[derive(PartialEq, Copy, Clone)]
 pub enum AuthorizationStatus {
     Ok = 0x00,
     Error = 0x01,

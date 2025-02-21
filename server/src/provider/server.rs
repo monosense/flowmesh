@@ -6,7 +6,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-const AUTHTOKEN: &str = "1a413d012682eb10342cdf7f0e33dd61c2b20e79e4c23feba399919f76d5b408";
+const AUTHTOKEN: &str = "1a413d012682eb10342cdf7f0e33dd61c2b20e79e4c23feba399919f76d5b409";
 
 enum ProviderPassedState {
     None,
@@ -51,23 +51,26 @@ async fn process(mut socket: TcpStream) {
                  * TODO: check if `authp.token` is valid in database
                  */
 
-                if hex::encode(authp.token) == AUTHTOKEN {
+                let status = if hex::encode(authp.token) == AUTHTOKEN {
                     println!("got correct auth token");
-                    let rep: AuthorizationReplyPacket =
-                        AuthorizationReplyPacket::new(AuthorizationStatus::Ok);
-                    let serialized = bincode::serialize(&rep).unwrap();
-                    if (socket.write(&serialized).await).is_err() {
-                        println!("failed to write auth reply packet to provider");
-                        let _ = socket.shutdown().await;
-                        return;
-                    }
                     passed = ProviderPassedState::Authorized;
+                    AuthorizationStatus::Ok
                 } else {
                     println!("incorrect auth token");
-                    let rep: AuthorizationReplyPacket =
-                        AuthorizationReplyPacket::new(AuthorizationStatus::Error);
-                    let serialized = bincode::serialize(&rep).unwrap();
-                    let _ = socket.write(&serialized).await;
+                    AuthorizationStatus::Error
+                };
+
+                let rep: AuthorizationReplyPacket = AuthorizationReplyPacket::new(status);
+                let serialized = bincode::serialize(&rep).unwrap();
+
+                if (socket.write(&serialized).await).is_err() {
+                    println!("failed to write auth reply packet to provider");
+                    let _ = socket.shutdown().await;
+                    return;
+                }
+
+                if status != AuthorizationStatus::Ok {
+                    println!("authorization status is not ok. disconnecting.");
                     let _ = socket.shutdown().await;
                     return;
                 }
